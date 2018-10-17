@@ -6,6 +6,7 @@ library(viridis)
 
 runs = read.csv("runs16384_extremecases.csv")
 
+# Independent variables used to create scenarios
 scen.vars = c(
   "eco_weights_choice",
   "WUE_flood_choice",
@@ -27,14 +28,6 @@ scen.vars = c(
   "crop_trend",
   "cj_options"
 )
-out.vars = c(
-  "profit_mean",
-  "profit_std",
-  "surface_index",
-  "gw_index",
-  "gwlevel_mean",
-  "gwlevel_min"
-)
 scen.vars.labelled<-c(
   "Flow req. weights","Flood WUE","Spray WUE","Spray adopt. rate",
   "Climate","Flood min. sep.","Flood min. duration","Flood CTF",
@@ -45,16 +38,31 @@ scen.vars.labelled<-c(
 )
 names(scen.vars.labelled)<-scen.vars
 
+# Dependent variables, produced by model
+out.vars = c(
+  "profit_mean",
+  "profit_std",
+  "surface_index",
+  "gw_index",
+  "gwlevel_mean",
+  "gwlevel_min"
+)
+
 ################################
 # Marginal effect of each variable on profit.mean ----
 diff = function(data, focus.var, out.var, scen.vars) {
+  # Identify the two values of the focus variable
   vals = data[[focus.var]] %>% unique() %>% as.character
   stopifnot(length(vals) == 2)
   
   data %>%
     select(!!out.var, !!scen.vars) %>%
+    # Spread the output variable into generic columns a and b
+    #  corresponding to the two values of the focus variable
     spread(!!focus.var, !!out.var) %>%
     rename(a = !!(vals[1]), b = !!(vals[[2]])) %>%
+    # Calculate marginal difference, then assign the
+    # values of the focus variable to a and b instead
     mutate(
       diff = a - b,
       a = !!(vals[1]),
@@ -73,10 +81,8 @@ stopifnot(identical(
 ))
 
 
-#Only select the variables with two levels
-scen.vars.varying = scen.vars[sapply(scen.vars, function(n)
-  length(unique(runs[[n]]))) == 2]
-
+# Calculate marginal effect for all variables with two levels
+scen.vars.varying = scen.vars[sapply(scen.vars, function(n) length(unique(runs[[n]]))) == 2]
 marginal.all = lapply(scen.vars.varying, function(focus.var)
   diff(runs, focus.var, "profit_mean", scen.vars)) %>% bind_rows
 
@@ -93,14 +99,14 @@ marginal.all <- runs$cj_options %>% unique %>% as.character() %>%
   bind_rows(marginal.all)
 
 
-# Emphasise what the difference is between
+# Emphasise what values the difference is between in the label
 marginal.all$focus.var2 <-
   with(marginal.all, sprintf("%s\n%s-%s", focus.var, a, b))
 
 
+# Order by average marginal effect
 marginal.mean.diff = marginal.all %>% group_by(focus.var2) %>% 
   summarise(mean_diff = abs(mean(diff))) %>% arrange(mean_diff)
-
 marginal.all$focus.var2 %<>% 
   ordered(.,
           levels = marginal.mean.diff$focus.var2,
@@ -155,6 +161,7 @@ stopifnot(identical(
     mutate(out.var="profit_mean",focus.var2=as.character(focus.var2))
 ))
 
+# Normalised mean marginal effect for all output variables
 mean.diff.all <-
   lapply(out.vars, function(out.var)
     mean_diff(runs, out.var, scen.vars)) %>% bind_rows
@@ -164,6 +171,8 @@ mean.diff.all.normalised <- mean.diff.all %>% group_by(out.var) %>%
     abs_mean_diff = abs(mean_diff),
     norm_mean_diff = abs_mean_diff / max(abs_mean_diff)
   )
+
+# Same order of focus variables as the first figure
 mean.diff.all.normalised$focus.var2 %<>% 
   ordered(., 
           levels = marginal.mean.diff$focus.var2,
@@ -189,7 +198,6 @@ mean.diff.all.normalised$out.var %<>% ordered(
   )
 )
 
-# As colour
 ggplot(data = mean.diff.all.normalised, aes(y = focus.var2, x = out.var)) +
   geom_tile(aes(fill = norm_mean_diff)) +
   scale_fill_viridis(
