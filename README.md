@@ -4,4 +4,4 @@ Files:
 
 * runs16384_extremecases.csv - Output from model runs
 * namoi scenario analysis.r - Main analysis
-* marginal_effects.R - Analysis of effect of each variable
+* marginal_effects.R - Analysis of marginal effect of each variable
